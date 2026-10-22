@@ -1,163 +1,132 @@
 # AI_Voice_Sales_Bot
 
-A Next.js voice sales app built with Tailwind CSS, Supabase, Gemini, the browser
-Web Speech API, and Gemini text-to-speech.
+An AI voice sales assistant for FlowDesk. It can hold a short spoken sales conversation, record it with the caller's consent, and save a useful call summary for later review.
 
-## Call flow and saved call review
+[View the project on GitHub](https://github.com/Tanuj-ai/AI_Voice_Sales_Bot)
 
-The call screen requires recording consent before starting. Aria announces the
-recording at the beginning. Web Audio mixes the customer's microphone and
-Aria's Gemini audio into one WebM recording. On End Call, the app uploads
-the recording to the private `recordings` bucket, saves the transcript, and
-asks Gemini for the summary, requirements, objections, next steps, and sales
-status. The response is checked against the expected JSON shape and six
-statuses, retried once if invalid, and falls back to **Follow-up Required**.
+## What I built
 
-The `/history` page lists saved calls. Select a call to see its summary, status,
-audio player, transcript, requirements, objections, and next steps. Private
-recording links expire after 10 minutes; reload the detail page to get a fresh
-link.
+I built a full-stack voice sales demo that brings together a live call screen and a saved-call history:
 
-The product knowledge base is in `lib/product-knowledge.ts`. It excludes
-sample prices marked as placeholders and security claims not provided by the
-plan. The call summary is based only on the transcript.
+- The caller chooses English or Hindi, gives recording consent, and talks with Aria.
+- The browser shows live speech-to-text, including words while the caller is still speaking.
+- Gemini writes Aria's replies using the FlowDesk facts in `lib/product-knowledge.ts`. The bot is instructed not to guess prices, plans, or security details.
+- Gemini text-to-speech gives Aria a voice. Web Audio mixes that audio with the caller's microphone so both sides are in the saved recording.
+- When the call ends, the app saves the recording, transcript, consent details, and an AI-generated summary to Supabase.
+- Call history shows the outcome, customer requirements, objections, next steps, transcript, and a recording player.
 
-## Set up Supabase and environment values
+The summary status is checked against these six values: **Converted**, **Interested**, **Follow-up Required**, **Not Interested**, **Demo Requested**, and **No Response**. If Gemini returns an invalid summary, the app retries once and then saves a safe **Follow-up Required** result.
 
-1. Create a Supabase project.
-2. In its SQL Editor, run `supabase/migrations/20261022_create_calls.sql` to
-   create the calls table and private recording bucket.
-3. Copy the environment template and fill in the required credentials:
+## How a call works
 
-   ```powershell
-   Copy-Item .env.example .env.local
-   ```
+1. Check the recording-consent box and choose a language.
+2. Start the call and allow microphone access. Aria announces the recording before the conversation begins.
+3. Speak naturally. The live transcript appears in the conversation, and Aria replies aloud.
+4. Select **End Call**. The app uploads the audio and transcript, then creates the summary.
+5. Open **Call history** to review the saved call.
 
-   `GEMINI_API_KEY`, `SUPABASE_URL`, and `SUPABASE_SERVICE_ROLE_KEY` are
-   required for a complete call. Model and voice settings have defaults in the
-   template.
-4. Keep `.env.local` private and restart the server after editing it. Provider
-   credentials are read only by server routes; do not add `NEXT_PUBLIC_` to
-   these values.
+## Technology
 
-Get a Gemini API key in [Google AI Studio](https://aistudio.google.com/app/apikey).
-The Gemini free tier has usage limits, and Google may use content submitted on
-the free tier to improve its products. Use demo data rather than sensitive
-customer calls with this configuration.
+| Part | Technology | What it does |
+| --- | --- | --- |
+| Web app | Next.js and React | Pages and server-side API routes |
+| Styling | Tailwind CSS | Responsive call, history, and detail screens |
+| Speech recognition | Browser Web Speech API | Turns the caller's speech into live text |
+| AI conversation and summary | Gemini API | Creates replies and analyzes completed calls |
+| Bot voice | Gemini text-to-speech | Reads Aria's replies aloud |
+| Database and audio storage | Supabase | Stores call details and private recordings |
+| Audio recording | Web Audio API and MediaRecorder | Mixes the caller and bot voice into one recording |
 
-Live speech recognition uses the browser's online recognition service, so the
-call needs an internet connection even though speech-to-text runs in the
-browser. Use Chrome on desktop or Android for the best compatibility.
+## Run it on your computer
 
-The service-role key is used only by server routes for the private bucket and
-calls table. The migration enables row-level security and adds no public
-policies for calls or recordings.
+### 1. Install Node.js
 
-## Run locally
+Install Node.js 20.9 or newer. Then open a terminal in this project folder.
 
-Requirements: Node.js 20.9 or newer.
+### 2. Set up Supabase
+
+Create a Supabase project. In its **SQL Editor**, open and run:
+
+`supabase/migrations/20261022_create_calls.sql`
+
+This creates the `calls` table and the private `recordings` storage bucket.
+
+### 3. Add your keys
+
+In the project terminal, make your local environment file:
+
+```powershell
+Copy-Item .env.example .env.local
+```
+
+Open `.env.local` in a text editor and fill in these three required values:
+
+| Variable | Where to get it |
+| --- | --- |
+| `GEMINI_API_KEY` | [Google AI Studio](https://aistudio.google.com/app/apikey) |
+| `SUPABASE_URL` | Supabase project **Settings → API** |
+| `SUPABASE_SERVICE_ROLE_KEY` | Supabase project **Settings → API**; keep this private |
+
+The model and voice settings already have defaults in `.env.example`. You can leave them as they are. Never add `NEXT_PUBLIC_` to these credentials, share `.env.local`, or commit it to GitHub.
+
+The Gemini free tier has usage limits. Google may use content submitted on the free tier to improve its products, so use demo conversations rather than sensitive customer calls.
+
+### 4. Start the app
+
+Run these commands in the project terminal:
 
 ```powershell
 npm.cmd install
 npm.cmd run dev
 ```
 
-Open the local address printed by Next.js (normally
-[http://localhost:3000](http://localhost:3000)). To check the production build,
-run `npm.cmd run build`, then `npm.cmd run start`.
+Open [http://localhost:3000](http://localhost:3000). If you change `.env.local` while the app is running, stop the server with **Ctrl+C** and run `npm.cmd run dev` again.
 
-## Test the summary and history
+## Try a test call
 
-Use Chrome on desktop or Android with the Supabase migration applied and all
-three required provider values filled in above.
+Use Chrome on a computer or Android device, and make sure you are online. The browser's speech-recognition service needs an internet connection.
 
-1. Make a call with consent, allow microphone access, speak at least a few
-   turns, then end the call. Wait for the saving message to finish.
-2. In Supabase Table Editor, confirm the row contains the consent timestamp,
-   transcript, duration, recording path, summary, three summary lists, status,
-   and status reason. Confirm the `.webm` object exists in the private
-   `recordings` bucket.
-3. Open `/history`. Confirm the new call is listed with its date, duration,
-   summary, and status. Open it and check the private audio player, transcript,
-   requirements, objections, and next steps.
-4. Try calls where the customer agrees to start the trial (**Converted**), asks
-   for a demo (**Demo Requested**), requests time or a callback (**Follow-up
-   Required**), is curious without committing (**Interested**), declines
-   (**Not Interested**), or stays silent (**No Response**).
-5. To check the fallback while keeping chat working, temporarily set
-   `GEMINI_SUMMARY_MODEL` to a nonexistent model name, restart the server,
-   and end a call. Its saved status should be **Follow-up Required**. Restore
-   the configured summary model afterward.
+1. Open the app, check the consent box, and start a short call.
+2. Allow microphone access and speak a few turns.
+3. End the call and wait for the saving message to finish.
+4. Open **Call history** and select the new call. Check the summary, transcript, notes, and recording.
+5. In Supabase, check that the call row was saved and the `.webm` file is in the private `recordings` bucket.
 
-Vercel Functions accept request bodies up to 4.5 MB. To stay below that limit,
-the app sends at most 2 MB of WebM audio plus the transcript in one request. If
-a call's recording is too large, the transcript and summary are still saved and
-the page explains that the audio was skipped. The mixed recording uses a voice
-optimized bitrate to keep typical short sales calls small. If another upload,
-summary, or history request fails, the page shows an error message.
+The app limits recordings to a safe upload size. If a recording is too large, it still saves the transcript and summary and tells you that the audio was skipped.
 
 ## Deploy to Vercel
 
-1. Apply `supabase/migrations/20261022_create_calls.sql` in the Supabase
-   project's SQL Editor. Confirm the `calls` table exists and the `recordings`
-   bucket is private.
-2. Push this project to a Git repository. Create an empty repository on GitHub,
-   then run these commands from the project folder in PowerShell (replace the
-   repository URL with your own):
+1. Make sure the Supabase migration above has been applied.
+2. In Vercel, create a project by importing [this GitHub repository](https://github.com/Tanuj-ai/AI_Voice_Sales_Bot).
+3. In **Settings → Environment Variables**, add the three required values from the table above. Add the optional model and voice values below only if you want to change the defaults.
+4. Deploy the project. Use the generated HTTPS address and Chrome so microphone access can work.
+5. Make a short test call and check that its summary and recording appear in call history.
 
-   ```powershell
-   git init
-   git add .
-   git commit -m "Initial AI_Voice_Sales_Bot"
-   git branch -M main
-   git remote add origin https://github.com/YOUR-ACCOUNT/YOUR-REPO.git
-   git push -u origin main
-   ```
+Vercel reads environment variables when it deploys. If you change one later, redeploy the project.
 
-   `.env.local` is excluded by `.gitignore`; never commit provider credentials.
-3. In Vercel, choose **Add New → Project**, import the GitHub repository, and
-   keep the project root as `./`. Vercel detects Next.js; use the default
-   install and build settings (`npm install` and `npm run build`).
-4. In the project's **Settings → Environment Variables**, add the values below
-   for **Production** and **Preview**. The chat, summary, TTS model, and voice
-   settings are optional because the app has defaults; setting them explicitly
-   keeps the deployment configuration visible. Do not prefix server credentials with
-   `NEXT_PUBLIC_`.
+## Environment settings
 
-   | Variable | Required | Value |
-   | --- | --- | --- |
-   | `GEMINI_API_KEY` | Yes | Google AI Studio API key |
-   | `GEMINI_CHAT_MODEL` | No | `gemini-3.8-flash` |
-   | `GEMINI_SUMMARY_MODEL` | No | `gemini-3.8-flash` |
-   | `GEMINI_TTS_MODEL` | No | `gemini-3.8-flash-lite-tts` |
-   | `GEMINI_TTS_VOICE` | No | `Kore` |
-   | `SUPABASE_URL` | Yes | Supabase project URL |
-   | `SUPABASE_SERVICE_ROLE_KEY` | Yes | Supabase service role key; keep private |
+| Variable | Required | Default |
+| --- | --- | --- |
+| `GEMINI_API_KEY` | Yes | — |
+| `SUPABASE_URL` | Yes | — |
+| `SUPABASE_SERVICE_ROLE_KEY` | Yes | — |
+| `GEMINI_CHAT_MODEL` | No | `gemini-3.8-flash` |
+| `GEMINI_SUMMARY_MODEL` | No | `gemini-3.8-flash` |
+| `GEMINI_TTS_MODEL` | No | `gemini-3.8-flash-lite-tts` |
+| `GEMINI_TTS_VOICE` | No | `Kore` |
 
-   Select both Production and Preview when adding each value. The Development
-   environment is optional because local development reads `.env.local`.
-5. Select **Deploy**. Wait for the build to finish, then open the generated
-   `https://` URL. Browser microphone access requires HTTPS; use Chrome on
-   desktop or Android and allow the microphone when prompted.
-6. Run the live checks in Section 14 of the build plan: consent, a short call,
-   interim transcript, both voices in the recording, saved summary/status, and
-   playback from `/history`. Also deny microphone access once to confirm the
-   visible recovery instructions.
-7. If you change any Vercel environment variable later, redeploy the project;
-   existing deployments do not receive updated values automatically.
+## Project files
 
-See Vercel's [Next.js deployment guide](https://vercel.com/docs/frameworks/nextjs)
-and [environment variable guide](https://vercel.com/docs/environment-variables/managing-environment-variables)
-for the dashboard screens and environment scopes.
+- `app/` — app pages and server API routes for chat, speech, and calls.
+- `components/` — call controls, conversation, call history, and call review screens.
+- `lib/product-knowledge.ts` — the product facts Aria is allowed to use.
+- `lib/call-summary.ts` — summary prompt, validation, and safe fallback.
+- `supabase/migrations/` — database table and private recording bucket setup.
 
-## Environment values
+## Notes and limitations
 
-| Variable | Used for |
-| --- | --- |
-| `GEMINI_API_KEY` | Server-side Gemini API access |
-| `GEMINI_CHAT_MODEL` | Model used for call replies |
-| `GEMINI_SUMMARY_MODEL` | Model used for call summaries and sales status |
-| `GEMINI_TTS_MODEL` | Gemini text-to-speech model |
-| `GEMINI_TTS_VOICE` | Gemini prebuilt voice name |
-| `SUPABASE_URL` | Server-side Supabase connection |
-| `SUPABASE_SERVICE_ROLE_KEY` | Server-side Supabase access; keep private |
+- This is a demo and does not include user sign-in. Keep it private and use demo data; add authentication before using it with real customer calls.
+- Live transcription uses the browser's online speech-recognition service. It may not work in every browser or when the device is offline.
+- The Supabase service-role key stays on the server. Call recordings are stored in a private bucket, and playback links expire after 10 minutes.
+- To check a production build locally, run `npm.cmd run build`, then `npm.cmd run start`.
